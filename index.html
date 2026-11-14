@@ -7164,33 +7164,33 @@
       document.getElementById('kpiMotms').textContent = s.motms || 0;
       document.getElementById('kpiWinRate').textContent = `${s.win_rate}%`;
 
-      // Passing & Playmaking
+      // Passing & Playmaking (Per 90)
       document.getElementById('metricPassAccLabel').textContent = `${s.pass_acc}% Acc`;
       document.getElementById('statPassAcc').textContent = `${s.pass_acc}%`;
       document.getElementById('barPassAcc').style.width = `${Math.min(100, s.pass_acc)}%`;
-      document.getElementById('statPassesSucc').textContent = Math.round(s.passes_successful);
-      document.getElementById('statPassesTotal').textContent = Math.round(s.passes_total);
+      document.getElementById('statPassesSucc').textContent = `${s.passes_successful_per_90 ?? Math.round(s.passes_successful)} / 90`;
+      document.getElementById('statPassesTotal').textContent = `${s.passes_per_90 ?? Math.round(s.passes_total)} / 90`;
       document.getElementById('statAssistsP90').textContent = s.assists_per_90;
       document.getElementById('statMinutes').textContent = `${Math.round(s.total_minutes)} mins`;
 
-      // Attacking & Shooting
+      // Attacking & Shooting (Per 90)
       document.getElementById('metricShotAccLabel').textContent = `${s.shot_acc}% On Target`;
       document.getElementById('statShotAcc').textContent = `${s.shot_acc}%`;
       document.getElementById('barShotAcc').style.width = `${Math.min(100, s.shot_acc)}%`;
       document.getElementById('statGoalsP90').textContent = s.goals_per_90;
       document.getElementById('statGAP90').textContent = s.ga_per_90;
-      document.getElementById('statShotsTargetTotal').textContent = `${Math.round(s.shots_on_target)} / ${Math.round(s.shots_total)}`;
+      document.getElementById('statShotsTargetTotal').textContent = `${s.shots_on_target_per_90 ?? Math.round(s.shots_on_target)} / ${s.shots_per_90 ?? Math.round(s.shots_total)} per 90`;
       const motmPct = s.apps > 0 ? ((s.motms / s.apps) * 100).toFixed(1) : 0;
       document.getElementById('statMotmPct').textContent = `${motmPct}% of matches (${s.motms} total)`;
 
-      // Defending & Athleticism
+      // Defending & Athleticism (Per 90)
       document.getElementById('metricTackleWinLabel').textContent = `${s.tackle_win_pct}% Win Rate`;
       document.getElementById('statTackleWin').textContent = `${s.tackle_win_pct}%`;
       document.getElementById('barTackleWin').style.width = `${Math.min(100, s.tackle_win_pct)}%`;
-      document.getElementById('statTacklesCount').textContent = `${Math.round(s.tackles_won)} / ${Math.round(s.tackles_total)}`;
+      document.getElementById('statTacklesCount').textContent = `${s.tackles_won_per_90 ?? Math.round(s.tackles_won)} / ${s.tackles_per_90 ?? Math.round(s.tackles_total)} per 90`;
       document.getElementById('statDistanceDribbled').textContent = `${s.avg_distance_dribbled || 0} m / match`;
       document.getElementById('statAvgSpeed').textContent = `${s.avg_speed || 0} km/h`;
-      document.getElementById('statDefActions').textContent = `${Math.round(s.interceptions)} Int / ${Math.round(s.clearances)} Clr`;
+      document.getElementById('statDefActions').textContent = `${s.interceptions_per_90 ?? Math.round(s.interceptions)} Int / ${s.clearances_per_90 ?? Math.round(s.clearances)} Clr per 90`;
 
       // Season Breakdown Table
       const seasonsTbody = document.getElementById('profileSeasonsTableBody');
@@ -7422,22 +7422,29 @@
       if (!ctx) return;
       if (profileRadarChartInstance) profileRadarChartInstance.destroy();
 
-      const normRating = Math.min(100, Math.max(0, (s.avg_rating / 10.0) * 100));
-      const normAttack = Math.min(100, Math.max(0, s.ga_per_90 * 50));
-      const normPass = Math.min(100, Math.max(0, s.pass_acc));
-      const normDefend = Math.min(100, Math.max(0, s.tackle_win_pct));
-      const normSpeed = Math.min(100, Math.max(0, (s.avg_speed / 20.0) * 100));
+      const pct = s.radar_percentiles || {};
+      const isPctEligible = !!pct.eligible;
+      const radarData = isPctEligible
+        ? [pct.rating || 0, pct.ga_p90 || 0, pct.pass_acc || 0, pct.tackle_win || 0, pct.speed || 0]
+        : [0, 0, 0, 0, 0];
+
+      const subEl = ctx.closest('.bg-slate-900')?.querySelector('p');
+      if (subEl) {
+        subEl.textContent = isPctEligible
+          ? `Per-90 percentile vs ${pct.pool_size} players (>10 matches & ≥900 mins)`
+          : `Requires >10 matches & ≥900 mins for percentile radar (${s.apps} apps, ${Math.round(s.total_minutes)} mins)`;
+      }
 
       profileRadarChartInstance = new Chart(ctx, {
         type: 'radar',
         data: {
-          labels: ['Overall Rating', 'Goal Threat (G+A)', 'Passing Acc', 'Defending/Tackles', 'Athleticism/Speed'],
+          labels: ['Overall Rating', 'Goal Threat (G+A/90)', 'Passing Acc', 'Tackle Win %', 'Athleticism/Speed'],
           datasets: [{
-            label: s.player_name,
-            data: [normRating, normAttack, normPass, normDefend, normSpeed],
-            backgroundColor: 'rgba(16, 185, 129, 0.25)',
-            borderColor: '#10b981',
-            pointBackgroundColor: '#10b981',
+            label: isPctEligible ? `${s.player_name} (Percentile)` : s.player_name,
+            data: radarData,
+            backgroundColor: isPctEligible ? 'rgba(16, 185, 129, 0.25)' : 'rgba(100, 116, 139, 0.15)',
+            borderColor: isPctEligible ? '#10b981' : '#64748b',
+            pointBackgroundColor: isPctEligible ? '#10b981' : '#64748b',
             pointBorderColor: '#fff',
             pointHoverBackgroundColor: '#fff',
             pointHoverBorderColor: '#10b981',
@@ -7459,7 +7466,12 @@
             }
           },
           plugins: {
-            legend: { display: false }
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (c) => isPctEligible ? `${c.label}: ${c.raw}th percentile` : 'Insufficient minutes (<10 matches / <900 mins)'
+              }
+            }
           }
         }
       });
