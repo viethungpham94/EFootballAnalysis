@@ -900,8 +900,23 @@
             result = {
               summary, seasons: seasonsOut,
               records: {
-                match: { goals: peakMatch('goals_scored'), assists: peakMatch('assists'), rating: peakMatch('overall_rating'), passes: peakMatch('passes_total'), tackles: peakMatch('tackles_total') },
-                season: { goals: peakSzn('goals'), assists: peakSzn('assists'), avg_rating: peakSzn('avg_rating'), apps: peakSzn('apps') }
+                match: {
+                  goals: peakMatch('goals_scored'),
+                  assists: peakMatch('assists'),
+                  passes: peakMatch('passes_total'),
+                  passes_successful: peakMatch('passes_successful'),
+                  shots: peakMatch('shots_total'),
+                  rating: peakMatch('overall_rating'),
+                  speed: peakMatch('average_speed'),
+                  dribble: peakMatch('distance_dribbled'),
+                  tackles: peakMatch('tackles_won')
+                },
+                season: {
+                  goals: peakSzn('goals'),
+                  assists: peakSzn('assists'),
+                  manager_motm: peakSzn('manager_motms'),
+                  rating: peakSzn('avg_rating')
+                }
               },
               milestones: milestonesOut, recent_matches: recent
             };
