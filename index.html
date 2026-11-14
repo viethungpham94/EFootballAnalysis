@@ -7614,17 +7614,29 @@
       // Recent Matches Table
       const matchesTbody = document.getElementById('profileMatchesTableBody');
       if (data.recent_matches && data.recent_matches.length > 0) {
-        matchesTbody.innerHTML = data.recent_matches.map(m => `
+        matchesTbody.innerHTML = data.recent_matches.map(m => {
+          const dSign = m.delta_vs_benchmark >= 0 ? '+' : '';
+          const dCls = m.delta_vs_benchmark >= 0 ? 'text-emerald-400' : 'text-rose-400';
+          const scoreLine = (m.team1_res && m.team2_res) ? `${m.team1_res} - ${m.team2_res}` : (m.MatchID || '-');
+          return `
           <tr class="hover:bg-slate-800/40 transition-colors">
-            <td class="p-2.5 text-center font-bold text-white">${Math.round(m.assists)}</td>
+            <td class="p-2.5 text-slate-400 whitespace-nowrap">${m.DateTime ? m.DateTime.split(' ')[0] : (m.season || '-')}</td>
+            <td class="p-2.5 text-white font-medium whitespace-nowrap">${scoreLine}</td>
+            <td class="p-2.5 text-slate-400 whitespace-nowrap">${m.competition || '-'}</td>
+            <td class="p-2.5 text-center"><span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">${m.highlighted_position || '-'}</span></td>
+            <td class="p-2.5 text-center font-bold text-white">${m.overall_rating}</td>
+            <td class="p-2.5 text-center font-bold ${dCls}">${dSign}${m.delta_vs_benchmark}</td>
+            <td class="p-2.5 text-center font-bold text-white">${Math.round(m.goals_scored || 0)}</td>
+            <td class="p-2.5 text-center font-bold text-white">${Math.round(m.assists || 0)}</td>
             <td class="p-2.5 text-center whitespace-nowrap">
-          ${m.manager_motm ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/30" title="Manager MOTM: outperformed benchmark by ${m.delta_vs_benchmark >= 0 ? '+' : ''}${m.delta_vs_benchmark}">👔 Mgr</span>` : ''}
-          ${m.MOTM ? `<span class="text-amber-400 font-bold text-xs" title="Official Star MOTM">⭐</span>` : ''}
-          ${!m.manager_motm && !m.MOTM ? `<span class="text-slate-600">-</span>` : ''}
-        </td>
-            <td class="p-2.5 text-center text-slate-400">${Math.round(m.time_on_pitch)}'</td>
+              ${m.manager_motm ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/30" title="Manager MOTM: outperformed benchmark by ${dSign}${m.delta_vs_benchmark}">👔 Mgr</span>` : ''}
+              ${m.MOTM ? `<span class="text-amber-400 font-bold text-xs" title="Official Star MOTM">⭐</span>` : ''}
+              ${!m.manager_motm && !m.MOTM ? `<span class="text-slate-600">-</span>` : ''}
+            </td>
+            <td class="p-2.5 text-center text-slate-400">${Math.round(m.time_on_pitch || 90)}'</td>
           </tr>
-        `).join('');
+        `;
+        }).join('');
       } else {
         matchesTbody.innerHTML = `<tr><td colspan="10" class="p-4 text-center text-slate-500">No match records found.</td></tr>`;
       }
