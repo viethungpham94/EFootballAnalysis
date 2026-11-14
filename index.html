@@ -550,36 +550,60 @@
               .sort((a, b) => (b.total_goals + b.total_assists) - (a.total_goals + a.total_assists))
               .slice(0, 8);
 
-            const topCol = (col) => [...rows].filter(r => num(r[col], 0) > 0).sort((a, b) => num(b[col]) - num(a[col]))[0];
-            const toRec = (r, col, unit) => r ? { player: displayName(r), val: num(r[col]) + (unit || ''), match: norm(r.MatchID) || norm(r.screenshot) } : { player: '-', val: '-', match: '-' };
+            const topMatchArr = (col) => [...rows].filter(r => num(r[col], 0) > 0)
+              .sort((a, b) => num(b[col]) - num(a[col]))
+              .slice(0, 5)
+              .map(r => ({
+                highlighted_player: displayName(r),
+                [col]: num(r[col]),
+                MatchID: norm(r.MatchID),
+                season: norm(r.season)
+              }));
             const allPlayers = d.players || [];
             const allByP = {};
             const seasonByP = {};
             for (const r of allPlayers) {
               const name = displayName(r);
               if (!name || name === 'Unknown') continue;
-              if (!allByP[name]) allByP[name] = { g: 0, a: 0, apps: 0, mmotm: 0 };
+              if (!allByP[name]) allByP[name] = { g: 0, a: 0, apps: 0, mmotm: 0, motm: 0, rSum: 0 };
               allByP[name].g += num(r.goals_scored, 0);
               allByP[name].a += num(r.assists, 0);
               allByP[name].apps += 1;
               allByP[name].mmotm += num(r.manager_motm, 0);
+              allByP[name].motm += num(r.MOTM, 0);
+              allByP[name].rSum += num(r.overall_rating, 6.0);
               const sk = name + '||' + norm(r.season);
-              if (!seasonByP[sk]) seasonByP[sk] = { player: name, season: norm(r.season), g: 0, a: 0 };
+              if (!seasonByP[sk]) seasonByP[sk] = { highlighted_player: name, season: norm(r.season), g: 0, a: 0, apps: 0 };
               seasonByP[sk].g += num(r.goals_scored, 0);
               seasonByP[sk].a += num(r.assists, 0);
+              seasonByP[sk].apps += 1;
             }
-            const topAll = (k, lbl) => {
-              const e = Object.entries(allByP).sort((a, b) => b[1][k] - a[1][k])[0];
-              return e ? { player: e[0], val: e[1][k] + ' ' + lbl, detail: e[1].apps + ' Apps' } : { player: '-', val: '-' };
-            };
-            const topSzn = (k, lbl) => {
-              const e = Object.values(seasonByP).sort((a, b) => b[k] - a[k])[0];
-              return e ? { player: e.player, val: e[k] + ' ' + lbl, season: e.season } : { player: '-', val: '-', season: '-' };
-            };
-            const topSum = (k, lbl) => {
-              const e = Object.values(byP).sort((a, b) => b[k] - a[k])[0];
-              return e ? { player: e.highlighted_player, val: e[k] + ' ' + lbl } : { player: '-', val: '-' };
-            };
+            const topAllArr = (k, outKey) => Object.entries(allByP)
+              .sort((a, b) => b[1][k] - a[1][k] || b[1].apps - a[1].apps)
+              .slice(0, 5)
+              .map(([player, x]) => ({
+                highlighted_player: player,
+                [outKey]: x[k],
+                apps: x.apps,
+                avg_rating: round(x.rSum / Math.max(1, x.apps), 2)
+              }));
+            const topSznArr = (k, outKey) => Object.values(seasonByP)
+              .sort((a, b) => b[k] - a[k])
+              .slice(0, 5)
+              .map(x => ({
+                highlighted_player: x.highlighted_player,
+                [outKey]: x[k],
+                season: x.season,
+                apps: x.apps
+              }));
+            const topScopeArr = (k, outKey) => Object.values(byP)
+              .sort((a, b) => b[k] - a[k] || b.apps - a.apps)
+              .slice(0, 5)
+              .map(x => ({
+                highlighted_player: x.highlighted_player,
+                [outKey]: x[k],
+                apps: x.apps
+              }));
             const gbBySeason = {};
             for (const m of (d.milestones || [])) {
               const aw = norm(m.award).toLowerCase();
@@ -598,23 +622,21 @@
               leaderboard: leaderboard.slice(0, 12),
               totals_distribution: totalsDist,
               records: {
-                dribble: toRec(topCol('distance_dribbled'), 'distance_dribbled', 'm'),
-                speed: toRec(topCol('average_speed'), 'average_speed', ' km/h'),
-                goals: toRec(topCol('goals_scored'), 'goals_scored', ' Gls'),
-                match_goals: toRec(topCol('goals_scored'), 'goals_scored', ' Gls'),
-                match_assists: toRec(topCol('assists'), 'assists', ' Ast'),
-                match_passes: toRec(topCol('passes_total'), 'passes_total', ' Pas'),
-                match_shots: toRec(topCol('shots_total'), 'shots_total', ' Sht'),
-                match_tackles: toRec(topCol('tackles_total'), 'tackles_total', ' Tkl'),
-                touches: toRec(topCol('touches'), 'touches', ' Tch'),
-                season_goals: topSzn('g', 'Gls'),
-                season_assists: topSzn('a', 'Ast'),
-                motm: topSum('mmotm', 'Mgr MOTM'),
-                fan_motm: topSum('motm', 'Fan MOTM'),
-                all_time_goals: topAll('g', 'Gls'),
-                all_time_assists: topAll('a', 'Ast'),
-                all_time_caps: topAll('apps', 'Apps'),
-                all_time_mgr_motm: topAll('mmotm', 'MOTM'),
+                speed: topMatchArr('average_speed'),
+                goals: topMatchArr('goals_scored'),
+                match_goals: topMatchArr('goals_scored'),
+                match_assists: topMatchArr('assists'),
+                match_passes: topMatchArr('passes_total'),
+                match_shots: topMatchArr('shots_total'),
+                match_tackles: topMatchArr('tackles_total'),
+                season_goals: topSznArr('g', 'total_season_goals'),
+                season_assists: topSznArr('a', 'total_season_assists'),
+                motm: topScopeArr('motm', 'total_motm'),
+                fan_motm: topScopeArr('motm', 'total_motm'),
+                all_time_goals: topAllArr('g', 'total_goals'),
+                all_time_assists: topAllArr('a', 'total_assists'),
+                all_time_caps: topAllArr('apps', 'apps'),
+                all_time_mgr_motm: topAllArr('mmotm', 'total_mgr_motm'),
                 golden_ball_by_year: gbList
               }
             };
