@@ -2859,8 +2859,8 @@
             <h3 class="text-xs font-bold text-white uppercase tracking-wider">📊 Player Attribute Profile</h3>
             <p class="text-[11px] text-slate-400">Multi-dimensional rating and proficiency radar</p>
           </div>
-          <div class="flex-1 flex items-center justify-center p-2 min-h-[260px]">
-            <canvas id="profileRadarChart" class="max-h-[250px]"></canvas>
+          <div class="flex-1 flex items-center justify-center p-2 min-h-[340px] sm:min-h-[380px]">
+            <canvas id="profileRadarChart" class="max-h-[340px] sm:max-h-[380px] w-full"></canvas>
           </div>
         </div>
 
@@ -3958,12 +3958,12 @@
             2nd: <span class="text-slate-300 font-semibold">${cand2.player.split(' ').pop()}${starBadge2}</span> <span class="font-mono">(${cand2.rolling_form})</span>
           </div>` : '';
         return `
-          <div class="flex flex-col items-center bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 shadow-lg min-w-[85px]">
-            <span class="text-[9px] font-black uppercase text-amber-400 tracking-wider">${role}</span>
-            <span class="text-[11px] font-bold text-white whitespace-nowrap">${cand.player.split(' ').pop()}${starBadge}</span>
+          <div class="flex flex-col items-center bg-slate-950/85 backdrop-blur-md px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-white/20 shadow-lg min-w-[66px] sm:min-w-[85px]">
+            <span class="text-[8px] sm:text-[9px] font-black uppercase text-amber-400 tracking-wider">${role}</span>
+            <span class="text-[9px] sm:text-[11px] font-bold text-white whitespace-nowrap">${cand.player.split(' ').pop()}${starBadge}</span>
             <div class="flex items-center gap-1 mt-0.5">
-              <span class="text-[10px] font-bold text-slate-200">⭐ ${cand.rolling_form}</span>
-              <span class="text-[9px] font-mono font-bold ${deltaClass}">(${deltaSign}${cand.delta})</span>
+              <span class="text-[9px] sm:text-[10px] font-bold text-slate-200">⭐ ${cand.rolling_form}</span>
+              <span class="text-[8px] sm:text-[9px] font-mono font-bold ${deltaClass}">(${deltaSign}${cand.delta})</span>
             </div>
             ${subHtml}
           </div>
@@ -7566,16 +7566,43 @@
       const msBadge = document.getElementById('profileMilestonesCountBadge');
       if (data.milestones && data.milestones.length > 0) {
         msBadge.textContent = `${data.milestones.length} Award${data.milestones.length > 1 ? 's' : ''}`;
-        msList.innerHTML = data.milestones.map(m => {
-          const meta = getAwardMetadata(m.award, m.category);
-          return `
-            <div class="flex items-start gap-3 p-3.5 rounded-xl border ${meta.rankCardClass} transition-all hover:scale-[1.02] shadow-sm">
-              <span class="text-2xl pt-0.5">${meta.rankIcon || meta.typeIcon}</span>
-              <div class="space-y-1 flex-1 min-w-0">
-                <h4 class="text-xs font-bold text-white truncate" title="${meta.title}">${meta.title}</h4>
-                <p class="text-[10px] text-slate-400 truncate">${m.competition || 'General'} • Season ${m.season || '-'}</p>
-                <div class="pt-0.5">${meta.rankBadge}</div>
+        const bySeason = {};
+        data.milestones.forEach(m => {
+          const szn = m.season || '-';
+          const comp = m.competition || 'General';
+          if (!bySeason[szn]) bySeason[szn] = {};
+          if (!bySeason[szn][comp]) bySeason[szn][comp] = [];
+          bySeason[szn][comp].push(m);
+        });
+        msList.className = 'space-y-4';
+        msList.innerHTML = Object.keys(bySeason).sort((a, b) => b.localeCompare(a)).map(szn => {
+          const comps = bySeason[szn];
+          const compBlocks = Object.keys(comps).sort().map(comp => {
+            const cards = comps[comp]
+              .sort((a, b) => (a.award || '').localeCompare(b.award || '') || (a.category || '').localeCompare(b.category || ''))
+              .map(m => {
+                const meta = getAwardMetadata(m.award, m.category);
+                return `
+                  <div class="flex items-start gap-3 p-3 rounded-xl border ${meta.rankCardClass} transition-all hover:scale-[1.02] shadow-sm">
+                    <span class="text-xl pt-0.5">${meta.rankIcon || meta.typeIcon}</span>
+                    <div class="space-y-1 flex-1 min-w-0">
+                      <h4 class="text-xs font-bold text-white truncate" title="${meta.title}">${meta.title}</h4>
+                      <div class="pt-0.5">${meta.rankBadge}</div>
+                    </div>
+                  </div>
+                `;
+              }).join('');
+            return `
+              <div class="space-y-2">
+                <div class="text-[11px] font-bold text-slate-300 uppercase tracking-wider px-1">${comp}</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">${cards}</div>
               </div>
+            `;
+          }).join('');
+          return `
+            <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 space-y-3">
+              <div class="text-xs font-black text-amber-400 uppercase tracking-wider border-b border-slate-800 pb-1.5">Season ${szn}</div>
+              ${compBlocks}
             </div>
           `;
         }).join('');
@@ -7589,15 +7616,6 @@
       if (data.recent_matches && data.recent_matches.length > 0) {
         matchesTbody.innerHTML = data.recent_matches.map(m => `
           <tr class="hover:bg-slate-800/40 transition-colors">
-            <td class="p-2.5 text-slate-400 whitespace-nowrap">${(m.DateTime || '').split('.')[0] || '-'}</td>
-            <td class="p-2.5 text-slate-300 whitespace-nowrap">${m.competition || '-'}</td>
-            <td class="p-2.5 font-bold text-white whitespace-nowrap">${m.MatchID || '-'}</td>
-            <td class="p-2.5 text-slate-200 whitespace-nowrap">
-              <span class="font-bold text-emerald-400">${m.team1_res || ''}</span> vs <span class="text-slate-400">${m.team2_res || ''}</span>
-            </td>
-            <td class="p-2.5 text-center"><span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">${m.highlighted_position || '-'}</span></td>
-            <td class="p-2.5 text-center font-black ${m.overall_rating >= 7.0 ? 'text-emerald-400' : 'text-slate-200'}">${m.overall_rating}</td>
-            <td class="p-2.5 text-center font-bold text-white">${Math.round(m.goals_scored)}</td>
             <td class="p-2.5 text-center font-bold text-white">${Math.round(m.assists)}</td>
             <td class="p-2.5 text-center whitespace-nowrap">
           ${m.manager_motm ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/30" title="Manager MOTM: outperformed benchmark by ${m.delta_vs_benchmark >= 0 ? '+' : ''}${m.delta_vs_benchmark}">👔 Mgr</span>` : ''}
