@@ -1599,16 +1599,22 @@
             <p class="text-xs text-slate-400 mt-0.5">Goals scored (GF) and conceded (GA) per 90 mins, plus competitor goal-share breakdowns</p>
           </div>
 
-          <!-- Mode Switcher: By Competition vs By Competitor -->
-          <div class="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
-            <button id="btnCompMode" onclick="setCompViewMode('competition')"
-                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-emerald-500 text-slate-950 shadow-sm">
-              🏆 Tournaments
-            </button>
-            <button id="btnRivalMode" onclick="setCompViewMode('competitor')"
-                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white">
-              ⚔️ Competitors (PBIX)
-            </button>
+          <!-- Mode Switcher & Min Matches Filter -->
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+              <label for="compMinMatchesInput" class="text-[11px] text-slate-400 font-semibold">Min Matches:</label>
+              <input id="compMinMatchesInput" type="number" min="1" max="50" value="2" onchange="onCompMinMatchesChange(this.value)" class="w-12 bg-slate-900 border border-slate-700 rounded-md px-1.5 py-0.5 text-xs text-white text-center font-mono focus:outline-none focus:border-emerald-500" />
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button id="btnCompMode" onclick="setCompViewMode('competition')"
+                      class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white">
+                🏆 Tournaments
+              </button>
+              <button id="btnRivalMode" onclick="setCompViewMode('competitor')"
+                      class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-emerald-500 text-slate-950 shadow-sm">
+                ⚔️ Competitors (PBIX)
+              </button>
+            </div>
           </div>
         </div>
 
@@ -4834,24 +4840,33 @@
       }
     }
 
+    let compMinMatches = 2;
+
+    function onCompMinMatchesChange(val) {
+      compMinMatches = Math.max(1, parseInt(val, 10) || 1);
+      if (currentTeamStatsData) {
+        renderCompetitionGoals(currentTeamStatsData);
+      }
+    }
+
     function renderCompetitionGoals(data) {
       if (!data) return;
       const isComp = (currentCompViewMode === 'competition');
 
-      // 1. Prepare items (per-90 sorted for bar charts)
+      // 1. Prepare items (per-90 sorted for bar charts), filtered by compMinMatches
       let itemsGf = [];
       let itemsGa = [];
       let itemsTable = [];
 
       if (isComp) {
-        const comps = (data.competitions || []);
+        const comps = (data.competitions || []).filter(it => (it.matches || 0) >= compMinMatches);
         itemsGf = [...comps].sort((a, b) => (b.gf_per_match - a.gf_per_match) || (b.matches - a.matches));
         itemsGa = [...comps].sort((a, b) => (b.ga_per_match - a.ga_per_match) || (b.matches - a.matches));
         itemsTable = itemsGf;
       } else {
-        itemsGf = (data.top_gf_per90_rivals || data.top_gf_rivals || []).slice(0, 10);
-        itemsGa = (data.top_ga_per90_rivals || data.top_ga_rivals || []).slice(0, 10);
-        itemsTable = (data.rivals || []).slice(0, 15);
+        itemsGf = (data.top_gf_per90_rivals || data.top_gf_rivals || []).filter(it => (it.matches || 0) >= compMinMatches).slice(0, 10);
+        itemsGa = (data.top_ga_per90_rivals || data.top_ga_rivals || []).filter(it => (it.matches || 0) >= compMinMatches).slice(0, 10);
+        itemsTable = (data.rivals || []).filter(it => (it.matches || 0) >= compMinMatches).slice(0, 15);
       }
 
       // 2. Chart 1: Top GF / 90 Mins
