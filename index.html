@@ -270,51 +270,38 @@
                   if (!belowMin) forms.push(entry);
                 }
               }
-              forms.sort((a, b) => (b.delta - a.delta) || (b.cum_rating - a.cum_rating) || (b.minutes_so_far - a.minutes_so_far));
               allForms.sort((a, b) => (b.delta - a.delta) || (b.cum_rating - a.cum_rating) || (b.minutes_so_far - a.minutes_so_far));
-              const used = new Set();
-              const squad = {};
-              for (const [role, allowed] of roleSpecs) {
-                let chosen = null;
-                for (const c of forms) {
-                  if (!used.has(c.player) && allowed.includes(c.position)) {
-                    chosen = c;
-                    used.add(c.player);
-                    break;
-                  }
+              const tierMins = [stepMinMins];
+              if (minPct !== null && !Number.isNaN(minPct) && minPct > 0) {
+                const topDec = Math.floor((minPct - 0.0001) / 10) * 10;
+                for (let pct = topDec; pct >= 0; pct -= 10) {
+                  tierMins.push((pct / 100) * availMatches * 90);
                 }
-                if (!chosen) {
+              } else if (stepMinMins > 0) {
+                tierMins.push(0);
+              }
+              const pickRoleCand = (allowed, usedSet) => {
+                for (let ti = 0; ti < tierMins.length; ti++) {
+                  const minReq = tierMins[ti];
                   for (const c of allForms) {
-                    if (!used.has(c.player) && allowed.includes(c.position)) {
-                      chosen = c;
-                      used.add(c.player);
-                      break;
+                    if (usedSet.has(c.player) || !allowed.includes(c.position)) continue;
+                    if (minReq <= 0 || c.minutes_so_far >= minReq) {
+                      usedSet.add(c.player);
+                      return { ...c, below_min_mins: ti > 0 };
                     }
                   }
                 }
-                squad[role] = chosen;
+                return null;
+              };
+              const used = new Set();
+              const squad = {};
+              for (const [role, allowed] of roleSpecs) {
+                squad[role] = pickRoleCand(allowed, used);
               }
               const used2 = new Set(used);
               const squad2 = {};
               for (const [role, allowed] of roleSpecs) {
-                let chosen2 = null;
-                for (const c of forms) {
-                  if (!used2.has(c.player) && allowed.includes(c.position)) {
-                    chosen2 = c;
-                    used2.add(c.player);
-                    break;
-                  }
-                }
-                if (!chosen2) {
-                  for (const c of allForms) {
-                    if (!used2.has(c.player) && allowed.includes(c.position)) {
-                      chosen2 = c;
-                      used2.add(c.player);
-                      break;
-                    }
-                  }
-                }
-                squad2[role] = chosen2;
+                squad2[role] = pickRoleCand(allowed, used2);
               }
               timeline.push({ step: stepIdx + 1, match_id: currentMid, squad, squad2 });
             }
