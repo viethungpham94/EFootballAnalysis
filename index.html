@@ -271,13 +271,14 @@
                 }
               }
               allForms.sort((a, b) => (b.delta - a.delta) || (b.cum_rating - a.cum_rating) || (b.minutes_so_far - a.minutes_so_far));
-              const tierMins = [stepMinMins];
+              const availMatches = priorMatchIds.size + stepIdx + 1;
+              const tierMins = [stepMin];
               if (minPct !== null && !Number.isNaN(minPct) && minPct > 0) {
                 const topDec = Math.floor((minPct - 0.0001) / 10) * 10;
                 for (let pct = topDec; pct >= 0; pct -= 10) {
                   tierMins.push((pct / 100) * availMatches * 90);
                 }
-              } else if (stepMinMins > 0) {
+              } else if (stepMin > 0) {
                 tierMins.push(0);
               }
               const pickRoleCand = (allowed, usedSet) => {
@@ -878,26 +879,28 @@
               for (const r of (td.players || [])) {
                 const pn = norm(r.highlighted_player).toLowerCase();
                 if (!pn) continue;
-                if (!byP[pn]) byP[pn] = { apps: 0, mins: 0, rSum: 0, ga: 0, pt: 0, ps: 0, tt: 0, tw: 0, spSum: 0 };
+                if (!byP[pn]) byP[pn] = { apps: 0, mins: 0, deltaSum: 0, ga: 0, ps: 0, tw: 0, spSum: 0, distSum: 0 };
                 const x = byP[pn];
+                const posKey = norm(r.highlighted_position).toUpperCase();
+                const bmVal = tBm[posKey] || 6.0;
                 x.apps += 1;
                 x.mins += safeMins(r.time_on_pitch, 90);
-                x.rSum += num(r.overall_rating, 0);
+                x.deltaSum += (num(r.overall_rating, 6.0) - bmVal);
                 x.ga += num(r.goals_scored, 0) + num(r.assists, 0);
-                x.pt += num(r.passes_total, 0);
                 x.ps += num(r.passes_successful, 0);
-                x.tt += num(r.tackles_total, 0);
                 x.tw += num(r.tackles_won, 0);
                 x.spSum += num(r.average_speed, 0);
+                x.distSum += num(r.distance_dribbled, 0);
               }
               const pool = Object.values(byP).filter(x => x.apps > 10 && x.mins >= 900).map(x => {
                 const xp90 = Math.max(1, x.mins / 90);
                 return {
-                  rating: x.rSum / x.apps,
+                  delta: x.deltaSum / x.apps,
                   ga_p90: x.ga / xp90,
-                  pass_acc: x.pt > 0 ? (x.ps * 100 / x.pt) : 0,
-                  tackle_win: x.tt > 0 ? (x.tw * 100 / x.tt) : 0,
-                  speed: x.spSum / x.apps
+                  pass_p90: x.ps / xp90,
+                  tackle_p90: x.tw / xp90,
+                  speed: x.spSum / x.apps,
+                  dist_p90: x.distSum / xp90
                 };
               });
               const calcPct = (val, arr) => {
@@ -907,14 +910,20 @@
                 return round(((below + 0.5 * eq) / arr.length) * 100, 1);
               };
               if (pool.length) {
+                const curDelta = pRows.reduce((s, r) => s + (num(r.overall_rating, 6.0) - (tBm[norm(r.highlighted_position).toUpperCase()] || 6.0)), 0) / apps;
+                const curPassP90 = ps / p90;
+                const curTackleP90 = tw / p90;
+                const curDistP90 = sumCol('distance_dribbled') / p90;
+                const speedPct = calcPct(summary.avg_speed, pool.map(x => x.speed));
+                const distPct = calcPct(curDistP90, pool.map(x => x.dist_p90));
                 radarPct = {
                   eligible: true,
                   pool_size: pool.length,
-                  rating: calcPct(summary.avg_rating, pool.map(x => x.rating)),
+                  delta: calcPct(curDelta, pool.map(x => x.delta)),
                   ga_p90: calcPct(summary.ga_per_90, pool.map(x => x.ga_p90)),
-                  pass_acc: calcPct(summary.pass_acc, pool.map(x => x.pass_acc)),
-                  tackle_win: calcPct(summary.tackle_win_pct, pool.map(x => x.tackle_win)),
-                  speed: calcPct(summary.avg_speed, pool.map(x => x.speed))
+                  pass_p90: calcPct(curPassP90, pool.map(x => x.pass_p90)),
+                  tackle_p90: calcPct(curTackleP90, pool.map(x => x.tackle_p90)),
+                  athleticism: round((speedPct + distPct) / 2, 1)
                 };
               }
             }
@@ -7614,7 +7623,7 @@
       const pct = s.radar_percentiles || {};
       const isPctEligible = !!pct.eligible;
       const radarData = isPctEligible
-        ? [pct.rating || 0, pct.ga_p90 || 0, pct.pass_acc || 0, pct.tackle_win || 0, pct.speed || 0]
+        ? [pct.delta || 0, pct.ga_p90 || 0, pct.pass_p90 || 0, pct.tackle_p90 || 0, pct.athleticism || 0]
         : [0, 0, 0, 0, 0];
 
       const subEl = ctx.closest('.bg-slate-900')?.querySelector('p');
@@ -7627,7 +7636,7 @@
       profileRadarChartInstance = new Chart(ctx, {
         type: 'radar',
         data: {
-          labels: ['Overall Rating', 'Goal Threat (G+A/90)', 'Passing Acc', 'Tackle Win %', 'Athleticism/Speed'],
+          labels: ['Benchmark Delta (Δ)', 'Goal Threat (G+A/90)', 'Succ. Passes / 90', 'Tackles Won / 90', 'Athleticism (Spd+Dist)'],
           datasets: [{
             label: isPctEligible ? `${s.player_name} (Percentile)` : s.player_name,
             data: radarData,
