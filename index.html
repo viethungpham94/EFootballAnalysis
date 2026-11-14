@@ -1074,8 +1074,15 @@
       };
 
       document.addEventListener('DOMContentLoaded', () => {
-        const ocrBtn = document.getElementById('tab-ocr');
-        if (ocrBtn) ocrBtn.classList.add('hidden');
+        ['tab-review', 'tab-audit', 'tab-ocr', 'bucket-ocr', 'view-review', 'view-audit', 'view-ocr'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            if (id === 'bucket-ocr' && el.previousElementSibling && el.previousElementSibling.classList.contains('w-px')) {
+              el.previousElementSibling.remove();
+            }
+            el.remove();
+          }
+        });
       });
     })();
   </script>
