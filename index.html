@@ -4859,14 +4859,14 @@
       let itemsTable = [];
 
       if (isComp) {
-        const comps = (data.competitions || []).filter(it => (it.matches || 0) >= compMinMatches);
-        itemsGf = [...comps].sort((a, b) => (b.gf_per_match - a.gf_per_match) || (b.matches - a.matches));
-        itemsGa = [...comps].sort((a, b) => (b.ga_per_match - a.ga_per_match) || (b.matches - a.matches));
+        const comps = (data.competitions || []).filter(it => (it.matches ?? it.played ?? 0) >= compMinMatches);
+        itemsGf = [...comps].sort((a, b) => (b.gf_per_match - a.gf_per_match) || ((b.matches ?? b.played ?? 0) - (a.matches ?? a.played ?? 0)));
+        itemsGa = [...comps].sort((a, b) => (b.ga_per_match - a.ga_per_match) || ((b.matches ?? b.played ?? 0) - (a.matches ?? a.played ?? 0)));
         itemsTable = itemsGf;
       } else {
-        itemsGf = (data.top_gf_per90_rivals || data.top_gf_rivals || []).filter(it => (it.matches || 0) >= compMinMatches).slice(0, 10);
-        itemsGa = (data.top_ga_per90_rivals || data.top_ga_rivals || []).filter(it => (it.matches || 0) >= compMinMatches).slice(0, 10);
-        itemsTable = (data.rivals || []).filter(it => (it.matches || 0) >= compMinMatches).slice(0, 15);
+        itemsGf = (data.top_gf_per90_rivals || data.top_gf_rivals || []).filter(it => (it.matches ?? it.played ?? 0) >= compMinMatches).slice(0, 10);
+        itemsGa = (data.top_ga_per90_rivals || data.top_ga_rivals || []).filter(it => (it.matches ?? it.played ?? 0) >= compMinMatches).slice(0, 10);
+        itemsTable = (data.rivals || []).filter(it => (it.matches ?? it.played ?? 0) >= compMinMatches).slice(0, 15);
       }
 
       // 2. Chart 1: Top GF / 90 Mins
