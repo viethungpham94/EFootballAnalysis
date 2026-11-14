@@ -2554,11 +2554,7 @@
               <span id="kpiAssists" class="text-base font-black text-white">--</span>
             </div>
             <div class="text-center px-2 py-1 border-l border-slate-800">
-              <span class="text-[10px] uppercase text-slate-400 font-bold block">G/90</span>
-              <span id="kpiG90" class="text-base font-black text-amber-400">--</span>
-            </div>
-            <div class="text-center px-2 py-1 border-l border-slate-800">
-              <span class="text-[10px] uppercase text-emerald-400 font-bold block" title="Manager MOTM: performance against benchmark">👔 Mgr MOTM</span>
+              <span class="text-[10px] uppercase text-emerald-400 font-bold block whitespace-nowrap" title="Manager MOTM: performance against benchmark">👔 Mgr MOTM</span>
               <span id="kpiManagerMotms" class="text-base font-black text-emerald-400">--</span>
             </div>
             <div class="text-center px-2 py-1 border-l border-slate-800">
@@ -2607,7 +2603,7 @@
             </div>
             <div class="flex justify-between border-b border-slate-800/60 pb-1.5 text-slate-300">
               <span class="text-slate-400">Assists (Per 90):</span>
-              <span id="statAssistsP90" class="font-bold text-amber-400">--</span>
+              <span id="statAssistsP90" class="font-bold text-white">--</span>
             </div>
             <div class="flex justify-between text-slate-300">
               <span class="text-slate-400">Total Minutes Played:</span>
@@ -7222,7 +7218,8 @@
       document.getElementById('kpiRating').textContent = `${s.avg_rating} ⭐`;
       document.getElementById('kpiGoals').textContent = Math.round(s.goals);
       document.getElementById('kpiAssists').textContent = Math.round(s.assists);
-      document.getElementById('kpiG90').textContent = s.goals_per_90;
+      const g90El = document.getElementById('kpiG90');
+      if (g90El) g90El.textContent = s.goals_per_90;
       const mgrEl = document.getElementById('kpiManagerMotms');
       if (mgrEl) mgrEl.textContent = s.manager_motms || 0;
       document.getElementById('kpiMotms').textContent = s.motms || 0;
