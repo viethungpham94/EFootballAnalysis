@@ -795,6 +795,55 @@
               win_rate: pRows.length ? round(wins * 100 / pRows.length, 1) : 0
             };
 
+            const eligible = pRows.length > 10 && totalMins >= 900;
+            let radarPct = { eligible: false, apps: pRows.length, mins: Math.round(totalMins) };
+            if (eligible) {
+              const byP = {};
+              for (const r of (td.players || [])) {
+                const pn = norm(r.highlighted_player).toLowerCase();
+                if (!pn) continue;
+                if (!byP[pn]) byP[pn] = { apps: 0, mins: 0, rSum: 0, ga: 0, pt: 0, ps: 0, tt: 0, tw: 0, spSum: 0 };
+                const x = byP[pn];
+                x.apps += 1;
+                x.mins += safeMins(r.time_on_pitch, 90);
+                x.rSum += num(r.overall_rating, 0);
+                x.ga += num(r.goals_scored, 0) + num(r.assists, 0);
+                x.pt += num(r.passes_total, 0);
+                x.ps += num(r.passes_successful, 0);
+                x.tt += num(r.tackles_total, 0);
+                x.tw += num(r.tackles_won, 0);
+                x.spSum += num(r.average_speed, 0);
+              }
+              const pool = Object.values(byP).filter(x => x.apps > 10 && x.mins >= 900).map(x => {
+                const xp90 = Math.max(1, x.mins / 90);
+                return {
+                  rating: x.rSum / x.apps,
+                  ga_p90: x.ga / xp90,
+                  pass_acc: x.pt > 0 ? (x.ps * 100 / x.pt) : 0,
+                  tackle_win: x.tt > 0 ? (x.tw * 100 / x.tt) : 0,
+                  speed: x.spSum / x.apps
+                };
+              });
+              const calcPct = (val, arr) => {
+                if (!arr.length) return 50;
+                let below = 0, eq = 0;
+                for (const v of arr) { if (v < val) below++; else if (v === val) eq++; }
+                return round(((below + 0.5 * eq) / arr.length) * 100, 1);
+              };
+              if (pool.length) {
+                radarPct = {
+                  eligible: true,
+                  pool_size: pool.length,
+                  rating: calcPct(summary.avg_rating, pool.map(x => x.rating)),
+                  ga_p90: calcPct(summary.ga_per_90, pool.map(x => x.ga_p90)),
+                  pass_acc: calcPct(summary.pass_acc, pool.map(x => x.pass_acc)),
+                  tackle_win: calcPct(summary.tackle_win_pct, pool.map(x => x.tackle_win)),
+                  speed: calcPct(summary.avg_speed, pool.map(x => x.speed))
+                };
+              }
+            }
+            summary.radar_percentiles = radarPct;
+
             const bySzn = {};
             for (const r of pRows) {
               const s = norm(r.season);
