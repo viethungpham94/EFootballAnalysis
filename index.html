@@ -1059,6 +1059,27 @@
     .custom-scroll::-webkit-scrollbar-thumb:hover {
       background: #10b981;
     }
+    html, body {
+      overflow-x: hidden;
+      max-width: 100%;
+    }
+    @media (max-width: 640px) {
+      main {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+      }
+      select, input[type="text"], input[type="number"] {
+        max-width: 100% !important;
+        min-width: 0 !important;
+      }
+      nav, header {
+        max-width: 100%;
+        overflow-x: auto;
+      }
+      .grid > * {
+        min-width: 0;
+      }
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
