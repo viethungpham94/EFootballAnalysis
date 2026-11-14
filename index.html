@@ -390,7 +390,16 @@
               .slice(0, 8)
               .map(([name, info], idx) => {
                 const avg = round(info.rSum / info.apps, 2);
-                const hist = matches.map(m => (m in info.byMid ? info.byMid[m] : null));
+                const win = [];
+                const hist = matches.map(m => {
+                  if (m in info.byMid) {
+                    win.push(info.byMid[m]);
+                    if (win.length > 5) win.shift();
+                    const rf = round(win.reduce((a, b) => a + b, 0) / win.length, 2);
+                    return { match_id: m, rating: info.byMid[m], rolling_form: rf };
+                  }
+                  return { match_id: m, rating: null, rolling_form: null };
+                });
                 return {
                   player: name, apps: info.apps, avg_rating: avg,
                   delta_vs_benchmark: round(avg - bmVal, 2),
@@ -447,8 +456,11 @@
               const bm = bmMap[x.highlighted_position] || 6.0;
               const avgRat = round(x.rSum / x.cnt, 2);
               const denom = Math.max(1, x.mins);
+              const deltaVal = round(avgRat - bm, 2);
               dataOut.push({
+                player: x.display_name,
                 display_name: x.display_name,
+                position: x.highlighted_position,
                 highlighted_position: x.highlighted_position,
                 apps,
                 total_minutes: round(x.mins, 0),
@@ -460,10 +472,11 @@
                 interceptions_per_90: round(x.ic * 90 / denom, 2),
                 motm_count: x.motm,
                 benchmark: bm,
-                delta_vs_benchmark: round(avgRat - bm, 2)
+                delta: deltaVal,
+                delta_vs_benchmark: deltaVal
               });
             }
-            dataOut.sort((a, b) => a.highlighted_position.localeCompare(b.highlighted_position) || (b.delta_vs_benchmark - a.delta_vs_benchmark) || (b.avg_rating - a.avg_rating));
+            dataOut.sort((a, b) => a.position.localeCompare(b.position) || (b.delta - a.delta) || (b.avg_rating - a.avg_rating));
             result = { data: dataOut };
           } else if (path === '/api/individual-metrics') {
             const season = q.get('season') || 'all';
@@ -567,8 +580,19 @@
               const e = Object.values(byP).sort((a, b) => b[k] - a[k])[0];
               return e ? { player: e.highlighted_player, val: e[k] + ' ' + lbl } : { player: '-', val: '-' };
             };
-            const gbRows = (d.milestones || []).filter(m => norm(m.award).toLowerCase() === 'golden ball' && norm(m.category).toLowerCase() === 'first').sort((a, b) => norm(b.season).localeCompare(norm(a.season)));
-            const gbList = gbRows.map(m => ({ season: m.season, player: m.player, competition: m.competition }));
+            const gbBySeason = {};
+            for (const m of (d.milestones || [])) {
+              const aw = norm(m.award).toLowerCase();
+              if (aw !== 'golden ball' && aw !== "ballon d'or") continue;
+              const szn = norm(m.season);
+              if (!szn) continue;
+              if (!gbBySeason[szn]) gbBySeason[szn] = { season: szn, winner: null, runner_up: null, third: null };
+              const cat = norm(m.category).toLowerCase();
+              if (cat === 'first' || cat === '1st' || cat === 'winner') gbBySeason[szn].winner = m.player;
+              else if (cat === 'second' || cat === '2nd' || cat === 'runner-up') gbBySeason[szn].runner_up = m.player;
+              else if (cat === 'third' || cat === '3rd') gbBySeason[szn].third = m.player;
+            }
+            const gbList = Object.values(gbBySeason).sort((a, b) => norm(b.season).localeCompare(norm(a.season)));
 
             result = {
               leaderboard: leaderboard.slice(0, 12),
@@ -599,24 +623,45 @@
             const minPasses = parseInt(q.get('min_passes') || '10', 10) || 0;
             const minShots = parseInt(q.get('min_shots') || '3', 10) || 0;
             const rows = (d.players || []).filter(p => !season || season === 'all' || norm(p.season) === season);
-            const passers = [];
-            const shooters = [];
+            const agg = {};
             for (const r of rows) {
               const name = displayName(r);
-              if (num(r.passes_total, 0) >= minPasses) {
-                passers.push({
+              if (!name || name === 'Unknown') continue;
+              if (!agg[name]) {
+                agg[name] = {
                   player: name, position: norm(r.highlighted_position),
-                  passes_total: num(r.passes_total, 0),
-                  pass_accuracy: round(num(r.passes_successful, 0) * 100 / Math.max(1, num(r.passes_total, 0)), 1),
-                  assists: num(r.assists, 0), rating: num(r.overall_rating, 6.0)
+                  apps: 0, pt: 0, ps: 0, st: 0, sot: 0, goals: 0, assists: 0, rSum: 0
+                };
+              }
+              const x = agg[name];
+              x.apps += 1;
+              x.pt += num(r.passes_total, 0);
+              x.ps += num(r.passes_successful, 0);
+              x.st += num(r.shots_total, 0);
+              x.sot += num(r.shots_on_target, 0);
+              x.goals += num(r.goals_scored, 0);
+              x.assists += num(r.assists, 0);
+              x.rSum += num(r.overall_rating, 6.0);
+            }
+            const passers = [];
+            const shooters = [];
+            for (const x of Object.values(agg)) {
+              if (x.apps < 2) continue;
+              const avgRat = round(x.rSum / x.apps, 2);
+              if (x.pt >= minPasses) {
+                passers.push({
+                  player: x.player, position: x.position,
+                  passes_total: x.pt,
+                  pass_accuracy: x.pt > 0 ? round(x.ps * 100 / x.pt, 1) : 0,
+                  assists: x.assists, rating: avgRat
                 });
               }
-              if (num(r.shots_total, 0) >= minShots) {
+              if (x.st >= minShots) {
                 shooters.push({
-                  player: name, position: norm(r.highlighted_position),
-                  shots_total: num(r.shots_total, 0),
-                  shot_accuracy: round(num(r.shots_on_target, 0) * 100 / Math.max(1, num(r.shots_total, 0)), 1),
-                  goals: num(r.goals_scored, 0), rating: num(r.overall_rating, 6.0)
+                  player: x.player, position: x.position,
+                  shots_total: x.st,
+                  shot_accuracy: x.st > 0 ? round(x.sot * 100 / x.st, 1) : 0,
+                  goals: x.goals, rating: avgRat
                 });
               }
             }
