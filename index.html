@@ -294,7 +294,29 @@
                 }
                 squad[role] = chosen;
               }
-              timeline.push({ step: stepIdx + 1, match_id: currentMid, squad });
+              const used2 = new Set(used);
+              const squad2 = {};
+              for (const [role, allowed] of roleSpecs) {
+                let chosen2 = null;
+                for (const c of forms) {
+                  if (!used2.has(c.player) && allowed.includes(c.position)) {
+                    chosen2 = c;
+                    used2.add(c.player);
+                    break;
+                  }
+                }
+                if (!chosen2) {
+                  for (const c of allForms) {
+                    if (!used2.has(c.player) && allowed.includes(c.position)) {
+                      chosen2 = c;
+                      used2.add(c.player);
+                      break;
+                    }
+                  }
+                }
+                squad2[role] = chosen2;
+              }
+              timeline.push({ step: stepIdx + 1, match_id: currentMid, squad, squad2 });
             }
             result = { season, total_matches: matchesSeq.length, timeline };
           } else if (path === '/api/golden-ball') {
@@ -3920,12 +3942,18 @@
       document.getElementById('timelineMatchBadge').textContent = step.match_id || `Matchday ${stepIdx + 1}`;
 
       const sq = step.squad;
+      const sq2 = step.squad2 || {};
 
-      const renderCard = (cand, role) => {
+      const renderCard = (cand, role, cand2) => {
         if (!cand) return `<div class="bg-black/50 text-[10px] px-2 py-1 rounded text-slate-500">${role}</div>`;
         const deltaClass = cand.delta >= 0 ? 'text-emerald-400' : 'text-rose-400';
         const deltaSign = cand.delta >= 0 ? '+' : '';
         const starBadge = cand.below_min_mins ? `<span class="text-amber-400 font-black ml-0.5" title="Below minimum minutes threshold (fallback)">*</span>` : '';
+        const starBadge2 = cand2 && cand2.below_min_mins ? `<span class="text-amber-400 font-black ml-0.5" title="Below minimum minutes threshold (fallback)">*</span>` : '';
+        const subHtml = cand2 ? `
+          <div class="mt-1 pt-0.5 border-t border-white/10 text-[9px] text-slate-400 whitespace-nowrap">
+            2nd: <span class="text-slate-300 font-semibold">${cand2.player.split(' ').pop()}${starBadge2}</span> <span class="font-mono">(${cand2.rolling_form})</span>
+          </div>` : '';
         return `
           <div class="flex flex-col items-center bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 shadow-lg min-w-[85px]">
             <span class="text-[9px] font-black uppercase text-amber-400 tracking-wider">${role}</span>
@@ -3934,28 +3962,29 @@
               <span class="text-[10px] font-bold text-slate-200">⭐ ${cand.rolling_form}</span>
               <span class="text-[9px] font-mono font-bold ${deltaClass}">(${deltaSign}${cand.delta})</span>
             </div>
+            ${subHtml}
           </div>
         `;
       };
 
       document.getElementById('pitch-att').innerHTML = `
-        ${renderCard(sq.LWF, 'LWF')}
-        ${renderCard(sq.CF, 'CF')}
-        ${renderCard(sq.RWF, 'RWF')}
+        ${renderCard(sq.LWF, 'LWF', sq2.LWF)}
+        ${renderCard(sq.CF, 'CF', sq2.CF)}
+        ${renderCard(sq.RWF, 'RWF', sq2.RWF)}
       `;
       document.getElementById('pitch-mid').innerHTML = `
-        ${renderCard(sq.CMF, 'CMF')}
-        ${renderCard(sq.AMF, 'AMF')}
-        ${renderCard(sq.DMF, 'DMF')}
+        ${renderCard(sq.CMF, 'CMF', sq2.CMF)}
+        ${renderCard(sq.AMF, 'AMF', sq2.AMF)}
+        ${renderCard(sq.DMF, 'DMF', sq2.DMF)}
       `;
       document.getElementById('pitch-def').innerHTML = `
-        ${renderCard(sq.LB, 'LB')}
-        ${renderCard(sq.CB1, 'CB')}
-        ${renderCard(sq.CB2, 'CB')}
-        ${renderCard(sq.RB, 'RB')}
+        ${renderCard(sq.LB, 'LB', sq2.LB)}
+        ${renderCard(sq.CB1, 'CB', sq2.CB1)}
+        ${renderCard(sq.CB2, 'CB', sq2.CB2)}
+        ${renderCard(sq.RB, 'RB', sq2.RB)}
       `;
       document.getElementById('pitch-gk').innerHTML = `
-        ${renderCard(sq.GK, 'GK')}
+        ${renderCard(sq.GK, 'GK', sq2.GK)}
       `;
     }
 
