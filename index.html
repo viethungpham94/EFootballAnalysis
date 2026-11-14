@@ -2549,19 +2549,19 @@
               </div>
             </div>
             <div class="flex justify-between border-b border-slate-800/60 pb-1.5 text-slate-300">
-              <span class="text-slate-400">Total Completed Passes:</span>
+              <span class="text-slate-400">Completed Passes (Per 90):</span>
               <span id="statPassesSucc" class="font-bold text-white">--</span>
             </div>
             <div class="flex justify-between border-b border-slate-800/60 pb-1.5 text-slate-300">
-              <span class="text-slate-400">Total Pass Attempts:</span>
+              <span class="text-slate-400">Pass Attempts (Per 90):</span>
               <span id="statPassesTotal" class="font-bold text-white">--</span>
             </div>
             <div class="flex justify-between border-b border-slate-800/60 pb-1.5 text-slate-300">
-              <span class="text-slate-400">Assists per 90:</span>
+              <span class="text-slate-400">Assists (Per 90):</span>
               <span id="statAssistsP90" class="font-bold text-amber-400">--</span>
             </div>
             <div class="flex justify-between text-slate-300">
-              <span class="text-slate-400">Total Touches / Involvement:</span>
+              <span class="text-slate-400">Total Minutes Played:</span>
               <span id="statMinutes" class="font-bold text-white">-- mins</span>
             </div>
           </div>
@@ -7179,12 +7179,14 @@
       document.getElementById('kpiMotms').textContent = s.motms || 0;
       document.getElementById('kpiWinRate').textContent = `${s.win_rate}%`;
 
+      const p90 = (s.total_minutes > 0 ? s.total_minutes / 90 : s.apps) || 1;
+
       // Passing & Playmaking (Per 90)
       document.getElementById('metricPassAccLabel').textContent = `${s.pass_acc}% Acc`;
       document.getElementById('statPassAcc').textContent = `${s.pass_acc}%`;
       document.getElementById('barPassAcc').style.width = `${Math.min(100, s.pass_acc)}%`;
-      document.getElementById('statPassesSucc').textContent = `${s.passes_successful_per_90 ?? Math.round(s.passes_successful)} / 90`;
-      document.getElementById('statPassesTotal').textContent = `${s.passes_per_90 ?? Math.round(s.passes_total)} / 90`;
+      document.getElementById('statPassesSucc').textContent = `${s.passes_successful_per_90 ?? (s.passes_successful / p90).toFixed(1)}`;
+      document.getElementById('statPassesTotal').textContent = `${s.passes_per_90 ?? (s.passes_total / p90).toFixed(1)}`;
       document.getElementById('statAssistsP90').textContent = s.assists_per_90;
       document.getElementById('statMinutes').textContent = `${Math.round(s.total_minutes)} mins`;
 
@@ -7194,7 +7196,7 @@
       document.getElementById('barShotAcc').style.width = `${Math.min(100, s.shot_acc)}%`;
       document.getElementById('statGoalsP90').textContent = s.goals_per_90;
       document.getElementById('statGAP90').textContent = s.ga_per_90;
-      document.getElementById('statShotsTargetTotal').textContent = `${s.shots_on_target_per_90 ?? Math.round(s.shots_on_target)} / ${s.shots_per_90 ?? Math.round(s.shots_total)} per 90`;
+      document.getElementById('statShotsTargetTotal').textContent = `${s.shots_on_target_per_90 ?? (s.shots_on_target / p90).toFixed(2)} / ${s.shots_per_90 ?? (s.shots_total / p90).toFixed(2)}`;
       const motmPct = s.apps > 0 ? ((s.motms / s.apps) * 100).toFixed(1) : 0;
       document.getElementById('statMotmPct').textContent = `${motmPct}% of matches (${s.motms} total)`;
 
@@ -7202,10 +7204,10 @@
       document.getElementById('metricTackleWinLabel').textContent = `${s.tackle_win_pct}% Win Rate`;
       document.getElementById('statTackleWin').textContent = `${s.tackle_win_pct}%`;
       document.getElementById('barTackleWin').style.width = `${Math.min(100, s.tackle_win_pct)}%`;
-      document.getElementById('statTacklesCount').textContent = `${s.tackles_won_per_90 ?? Math.round(s.tackles_won)} / ${s.tackles_per_90 ?? Math.round(s.tackles_total)} per 90`;
+      document.getElementById('statTacklesCount').textContent = `${s.tackles_won_per_90 ?? (s.tackles_won / p90).toFixed(2)} / ${s.tackles_per_90 ?? (s.tackles_total / p90).toFixed(2)}`;
       document.getElementById('statDistanceDribbled').textContent = `${s.avg_distance_dribbled || 0} m / match`;
       document.getElementById('statAvgSpeed').textContent = `${s.avg_speed || 0} km/h`;
-      document.getElementById('statDefActions').textContent = `${s.interceptions_per_90 ?? Math.round(s.interceptions)} Int / ${s.clearances_per_90 ?? Math.round(s.clearances)} Clr per 90`;
+      document.getElementById('statDefActions').textContent = `${s.interceptions_per_90 ?? (s.interceptions / p90).toFixed(2)} Int / ${s.clearances_per_90 ?? (s.clearances / p90).toFixed(2)} Clr`;
 
       // Season Breakdown Table
       const seasonsTbody = document.getElementById('profileSeasonsTableBody');
