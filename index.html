@@ -3995,8 +3995,8 @@
         const starBadge = cand.below_min_mins ? `<span class="text-amber-400 font-black ml-0.5" title="Below minimum minutes threshold (fallback)">*</span>` : '';
         const starBadge2 = cand2 && cand2.below_min_mins ? `<span class="text-amber-400 font-black ml-0.5" title="Below minimum minutes threshold (fallback)">*</span>` : '';
         const subHtml = cand2 ? `
-          <div class="mt-1 pt-0.5 border-t border-white/10 text-[9px] text-slate-400 whitespace-nowrap">
-            2nd: <span class="text-slate-300 font-semibold">${cand2.player.split(' ').pop()}${starBadge2}</span> <span class="font-mono">(${cand2.rolling_form})</span>
+          <div class="mt-1 pt-0.5 border-t border-white/10 text-[9px] text-slate-400 whitespace-nowrap flex flex-col items-center sm:block">
+            <span class="text-slate-300 font-semibold">${cand2.player.split(' ').pop()}${starBadge2}</span> <span class="font-mono">(${cand2.rolling_form})</span>
           </div>` : '';
         return `
           <div class="flex flex-col items-center bg-slate-950/85 backdrop-blur-md px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-white/20 shadow-lg min-w-[66px] sm:min-w-[85px]">
@@ -4361,11 +4361,7 @@
               },
               scales: {
                 x: {
-                  grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                  ticks: {
-                    color: '#94a3b8',
-                    callback: (val) => isPercentage ? `${val}%` : val
-                  }
+                  display: false
                 },
                 y: {
                   grid: { display: false },
@@ -4374,8 +4370,31 @@
                     font: { weight: 'bold', size: 12 }
                   }
                 }
+              },
+              layout: {
+                padding: { right: 52 }
               }
-            }
+            },
+            plugins: [{
+              id: 'barValueLabels',
+              afterDatasetsDraw(chart) {
+                const { ctx } = chart;
+                const meta = chart.getDatasetMeta(0);
+                if (!meta || !meta.data) return;
+                ctx.save();
+                ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+                ctx.fillStyle = '#e2e8f0';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                meta.data.forEach((bar, i) => {
+                  const val = values[i];
+                  if (val === null || val === undefined) return;
+                  const text = isPercentage ? `${val}%` : `${val}`;
+                  ctx.fillText(text, bar.x + 8, bar.y);
+                });
+                ctx.restore();
+              }
+            }]
           });
         }
 
@@ -4825,6 +4844,42 @@
             </div>
             <div class="mt-2 space-y-1">
               ${renderRunnersUp(rec.streak_ga, 'streak', ' gms')}
+            </div>
+          </div>
+
+          <!-- Goal Hat-tricks & Pokers -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-rose-500/30 hover:border-rose-500/60 transition-all flex flex-col justify-between shadow-sm">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] font-black uppercase text-rose-400 tracking-wider">🎩 Goal Hat-tricks &amp; Pokers</span>
+                <span class="text-xs">⚽</span>
+              </div>
+              <span class="text-base font-bold text-white hover:text-rose-300 cursor-pointer transition-colors block truncate" onclick="openPlayerProfile('${encodeURIComponent(rec.goal_hattricks && rec.goal_hattricks[0] ? rec.goal_hattricks[0].highlighted_player : '')}')">
+                ${rec.goal_hattricks && rec.goal_hattricks[0] ? rec.goal_hattricks[0].highlighted_player : '-'}
+              </span>
+              <span class="text-xs text-rose-300 font-bold block">${rec.goal_hattricks && rec.goal_hattricks[0] ? rec.goal_hattricks[0].total_hattricks + 'x (3+ Goals)' : '-'}</span>
+              <span class="text-[10px] text-slate-500 block">${rec.goal_hattricks && rec.goal_hattricks[0] ? `3G: ${rec.goal_hattricks[0].hattricks} • Poker (4G): ${rec.goal_hattricks[0].pokers}${rec.goal_hattricks[0].five_plus ? ' • 5G+: ' + rec.goal_hattricks[0].five_plus : ''}` : ''}</span>
+            </div>
+            <div class="mt-2 space-y-1">
+              ${renderRunnersUp(rec.goal_hattricks, 'total_hattricks', 'x')}
+            </div>
+          </div>
+
+          <!-- Assist Hat-tricks & Pokers -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-sky-500/30 hover:border-sky-500/60 transition-all flex flex-col justify-between shadow-sm">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] font-black uppercase text-sky-400 tracking-wider">🎩 Assist Hat-tricks &amp; Pokers</span>
+                <span class="text-xs">🎯</span>
+              </div>
+              <span class="text-base font-bold text-white hover:text-sky-300 cursor-pointer transition-colors block truncate" onclick="openPlayerProfile('${encodeURIComponent(rec.assist_hattricks && rec.assist_hattricks[0] ? rec.assist_hattricks[0].highlighted_player : '')}')">
+                ${rec.assist_hattricks && rec.assist_hattricks[0] ? rec.assist_hattricks[0].highlighted_player : '-'}
+              </span>
+              <span class="text-xs text-sky-300 font-bold block">${rec.assist_hattricks && rec.assist_hattricks[0] ? rec.assist_hattricks[0].total_hattricks + 'x (3+ Assists)' : '-'}</span>
+              <span class="text-[10px] text-slate-500 block">${rec.assist_hattricks && rec.assist_hattricks[0] ? `3A: ${rec.assist_hattricks[0].hattricks} • Poker (4A): ${rec.assist_hattricks[0].pokers}${rec.assist_hattricks[0].five_plus ? ' • 5A+: ' + rec.assist_hattricks[0].five_plus : ''}` : ''}</span>
+            </div>
+            <div class="mt-2 space-y-1">
+              ${renderRunnersUp(rec.assist_hattricks, 'total_hattricks', 'x')}
             </div>
           </div>
         `;
@@ -7054,9 +7109,10 @@
           document.getElementById('ocrElapsedTimer').textContent = `${elapsedSec}s elapsed`;
         }
 
-        const total = data.total || 1;
-        const current = data.current_index || 0;
-        const percent = Math.min(100, Math.round((current / total) * 100));
+        const total = data.total || 0;
+        const completed = (data.processed_count || 0) + (data.skipped_count || 0) + (data.error_count || 0);
+        const current = data.current_index || completed;
+        const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
 
         document.getElementById('batchProgressBar').style.width = percent + '%';
         document.getElementById('ocrLiveSuccess').textContent = data.processed_count;
@@ -7066,6 +7122,9 @@
         if (data.current_file) {
           document.getElementById('batchCurrentFileText').textContent = `Processing (${current}/${total}): ${data.current_file}`;
           document.getElementById('batchProgressText').textContent = `Batch OCR In Progress (${percent}%)`;
+        } else if (data.status === 'done') {
+          document.getElementById('batchProgressBar').style.width = '100%';
+          document.getElementById('batchProgressText').textContent = `Batch OCR Complete (100%)`;
         }
 
         if (data.logs && data.logs.length > 0) {
