@@ -234,7 +234,7 @@
             const roleSpecs = [
               ['GK', ['GK']], ['LB', ['LB']], ['CB1', ['CB']], ['CB2', ['CB']],
               ['RB', ['RB']], ['DMF', ['DMF']], ['CMF', ['CMF']], ['AMF', ['AMF']],
-              ['LWF', ['LWF', 'LSS']], ['CF', ['CF', 'SS']], ['RWF', ['RWF', 'RSS']]
+              ['LWF', ['LWF', 'LSS']], ['CF', ['CF']], ['RWF', ['RWF', 'RSS']]
             ];
             const timeline = [];
             for (let stepIdx = 0; stepIdx < matchesSeq.length; stepIdx++) {
@@ -375,8 +375,10 @@
             const season = q.get('season') || 'all';
             const comp = q.get('competition') || 'all';
             const pos = norm(q.get('position') || 'AMF').toUpperCase();
-            const bmVal = bmMap[pos] || 6.5;
-            const rows = filterPlayers(d, matchMeta, season, comp).filter(p => norm(p.highlighted_position).toUpperCase() === pos);
+            const posGroup = pos === 'LWF' ? ['LWF', 'LSS'] : pos === 'RWF' ? ['RWF', 'RSS'] : [pos];
+            const bmVals = posGroup.map(p => bmMap[p]).filter(v => v !== undefined);
+            const bmVal = bmVals.length ? round(bmVals.reduce((a, b) => a + b, 0) / bmVals.length, 2) : 6.5;
+            const rows = filterPlayers(d, matchMeta, season, comp).filter(p => posGroup.includes(norm(p.highlighted_position).toUpperCase()));
 
             const seqMap = {};
             for (const r of rows) {
@@ -628,6 +630,29 @@
             }
             const gbList = Object.values(gbBySeason).sort((a, b) => norm(b.season).localeCompare(norm(a.season)));
 
+            const stOrdered = [...allPlayers].sort((a, b) => {
+              const ma = matchMeta[norm(a.MatchID)], mb = matchMeta[norm(b.MatchID)];
+              const da = (ma && ma.datetime_val) || norm(a.DateTime), db2 = (mb && mb.datetime_val) || norm(b.DateTime);
+              return da.localeCompare(db2) || ((ma ? ma.match_order : num(a.id)) - (mb ? mb.match_order : num(b.id)));
+            });
+            const stMap = {};
+            for (const r of stOrdered) {
+              const pn = displayName(r);
+              if (!pn || pn === 'Unknown') continue;
+              if (!stMap[pn]) stMap[pn] = { apps: 0, cg: 0, mg: 0, ca: 0, ma: 0, cga: 0, mga: 0 };
+              const x = stMap[pn];
+              x.apps += 1;
+              const gv = num(r.goals_scored, 0), av = num(r.assists, 0);
+              x.cg = gv >= 1 ? x.cg + 1 : 0; if (x.cg > x.mg) x.mg = x.cg;
+              x.ca = av >= 1 ? x.ca + 1 : 0; if (x.ca > x.ma) x.ma = x.ca;
+              x.cga = (gv + av) >= 1 ? x.cga + 1 : 0; if (x.cga > x.mga) x.mga = x.cga;
+            }
+            const topStreakArr = (k) => Object.entries(stMap)
+              .filter(([, v]) => v[k] > 0)
+              .sort((a, b) => (b[1][k] - a[1][k]) || (b[1].apps - a[1].apps))
+              .slice(0, 5)
+              .map(([player, v]) => ({ highlighted_player: player, streak: v[k], apps: v.apps }));
+
             result = {
               leaderboard: leaderboard.slice(0, 12),
               totals_distribution: totalsDist,
@@ -647,6 +672,9 @@
                 all_time_assists: topAllArr('a', 'total_assists'),
                 all_time_caps: topAllArr('apps', 'apps'),
                 all_time_mgr_motm: topAllArr('mmotm', 'total_mgr_motm'),
+                streak_goals: topStreakArr('mg'),
+                streak_assists: topStreakArr('ma'),
+                streak_ga: topStreakArr('mga'),
                 golden_ball_by_year: gbList
               }
             };
@@ -982,6 +1010,19 @@
                 };
               });
 
+            const pOrdered = [...pRows].sort((a, b) => {
+              const ma = tMeta[norm(a.MatchID)], mb = tMeta[norm(b.MatchID)];
+              const da = (ma && ma.datetime_val) || norm(a.DateTime), db2 = (mb && mb.datetime_val) || norm(b.DateTime);
+              return da.localeCompare(db2) || ((ma ? ma.match_order : num(a.id)) - (mb ? mb.match_order : num(b.id)));
+            });
+            let cg = 0, mg = 0, ca = 0, ma = 0, cga = 0, mga = 0;
+            for (const r of pOrdered) {
+              const gv = num(r.goals_scored, 0), av = num(r.assists, 0);
+              cg = gv >= 1 ? cg + 1 : 0; if (cg > mg) mg = cg;
+              ca = av >= 1 ? ca + 1 : 0; if (ca > ma) ma = ca;
+              cga = (gv + av) >= 1 ? cga + 1 : 0; if (cga > mga) mga = cga;
+            }
+
             result = {
               summary, seasons: seasonsOut,
               records: {
@@ -1001,7 +1042,8 @@
                   assists: peakSzn('assists'),
                   manager_motm: peakSzn('manager_motms'),
                   rating: peakSzn('avg_rating')
-                }
+                },
+                streaks: { goals: mg, assists: ma, ga: mga }
               },
               milestones: milestonesOut, recent_matches: recent
             };
@@ -1235,14 +1277,12 @@
     <!-- Global Season / Comp Filters -->
     <div class="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 shadow-sm">
       <div class="flex items-center space-x-1 text-xs text-slate-300">
-        <span class="text-slate-400 font-medium">Season:</span>
         <select id="globalSeason" onchange="onFilterChange()" class="bg-slate-900 text-slate-200 text-xs rounded-lg px-2 py-1 border border-slate-700 outline-none focus:border-emerald-500">
           <option value="all">All Seasons</option>
         </select>
       </div>
       <div class="h-4 w-px bg-slate-700"></div>
       <div class="flex items-center space-x-1 text-xs text-slate-300">
-        <span class="text-slate-400 font-medium">Comp:</span>
         <select id="globalComp" onchange="onFilterChange()" class="bg-slate-900 text-slate-200 text-xs rounded-lg px-2 py-1 border border-slate-700 outline-none focus:border-emerald-500">
           <option value="all">All Competitions</option>
         </select>
@@ -1381,8 +1421,8 @@
         <div class="flex flex-wrap gap-2">
           <button onclick="selectPositionForm('AMF')" class="pos-btn px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-500 text-slate-950 transition-all" data-pos="AMF">AMF</button>
           <button onclick="selectPositionForm('CF')" class="pos-btn px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 transition-all border border-slate-800" data-pos="CF">CF</button>
-          <button onclick="selectPositionForm('LWF')" class="pos-btn px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 transition-all border border-slate-800" data-pos="LWF">LWF</button>
-          <button onclick="selectPositionForm('RWF')" class="pos-btn px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 transition-all border border-slate-800" data-pos="RWF">RWF</button>
+          <button onclick="selectPositionForm('LWF')" class="pos-btn px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 transition-all border border-slate-800" data-pos="LWF">LWF / LSS</button>
+          <button onclick="selectPositionForm('RWF')" class="pos-btn px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 transition-all border border-slate-800" data-pos="RWF">RWF / RSS</button>
           <button onclick="selectPositionForm('CMF')" class="pos-btn px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 transition-all border border-slate-800" data-pos="CMF">CMF</button>
           <button onclick="selectPositionForm('DMF')" class="pos-btn px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 transition-all border border-slate-800" data-pos="DMF">DMF</button>
           <button onclick="selectPositionForm('CB')" class="pos-btn px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 transition-all border border-slate-800" data-pos="CB">CB</button>
@@ -4732,6 +4772,60 @@
               ${renderRunnersUp(rec.speed, 'average_speed', ' km/h')}
             </div>
           </div>
+
+          <!-- Goal Streak -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-orange-500/30 hover:border-orange-500/60 transition-all flex flex-col justify-between shadow-sm">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] font-black uppercase text-orange-400 tracking-wider">🔥 Goal Streak</span>
+                <span class="text-xs">⚡</span>
+              </div>
+              <span class="text-base font-bold text-white hover:text-orange-300 cursor-pointer transition-colors block truncate" onclick="openPlayerProfile('${encodeURIComponent(rec.streak_goals && rec.streak_goals[0] ? rec.streak_goals[0].highlighted_player : '')}')">
+                ${rec.streak_goals && rec.streak_goals[0] ? rec.streak_goals[0].highlighted_player : '-'}
+              </span>
+              <span class="text-xs text-orange-300 font-bold block">${rec.streak_goals && rec.streak_goals[0] ? rec.streak_goals[0].streak + ' Consecutive Games' : '-'}</span>
+              <span class="text-[10px] text-slate-500 block">${rec.streak_goals && rec.streak_goals[0] ? rec.streak_goals[0].apps + ' appearances' : ''}</span>
+            </div>
+            <div class="mt-2 space-y-1">
+              ${renderRunnersUp(rec.streak_goals, 'streak', ' gms')}
+            </div>
+          </div>
+
+          <!-- Assist Streak -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-teal-500/30 hover:border-teal-500/60 transition-all flex flex-col justify-between shadow-sm">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] font-black uppercase text-teal-400 tracking-wider">🎯 Assist Streak</span>
+                <span class="text-xs">⚡</span>
+              </div>
+              <span class="text-base font-bold text-white hover:text-teal-300 cursor-pointer transition-colors block truncate" onclick="openPlayerProfile('${encodeURIComponent(rec.streak_assists && rec.streak_assists[0] ? rec.streak_assists[0].highlighted_player : '')}')">
+                ${rec.streak_assists && rec.streak_assists[0] ? rec.streak_assists[0].highlighted_player : '-'}
+              </span>
+              <span class="text-xs text-teal-300 font-bold block">${rec.streak_assists && rec.streak_assists[0] ? rec.streak_assists[0].streak + ' Consecutive Games' : '-'}</span>
+              <span class="text-[10px] text-slate-500 block">${rec.streak_assists && rec.streak_assists[0] ? rec.streak_assists[0].apps + ' appearances' : ''}</span>
+            </div>
+            <div class="mt-2 space-y-1">
+              ${renderRunnersUp(rec.streak_assists, 'streak', ' gms')}
+            </div>
+          </div>
+
+          <!-- Goal Contribution Streak -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-lime-500/30 hover:border-lime-500/60 transition-all flex flex-col justify-between shadow-sm">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] font-black uppercase text-lime-400 tracking-wider">⚡ G+A Streak</span>
+                <span class="text-xs">🔥</span>
+              </div>
+              <span class="text-base font-bold text-white hover:text-lime-300 cursor-pointer transition-colors block truncate" onclick="openPlayerProfile('${encodeURIComponent(rec.streak_ga && rec.streak_ga[0] ? rec.streak_ga[0].highlighted_player : '')}')">
+                ${rec.streak_ga && rec.streak_ga[0] ? rec.streak_ga[0].highlighted_player : '-'}
+              </span>
+              <span class="text-xs text-lime-300 font-bold block">${rec.streak_ga && rec.streak_ga[0] ? rec.streak_ga[0].streak + ' Consecutive Games' : '-'}</span>
+              <span class="text-[10px] text-slate-500 block">${rec.streak_ga && rec.streak_ga[0] ? rec.streak_ga[0].apps + ' appearances' : ''}</span>
+            </div>
+            <div class="mt-2 space-y-1">
+              ${renderRunnersUp(rec.streak_ga, 'streak', ' gms')}
+            </div>
+          </div>
         `;
 
         // 5. Render Ballon d'Or / Golden Ball Winners by Year
@@ -7415,6 +7509,7 @@
       // Personal & Match Records
       const matchRecs = (data.records && data.records.match) || {};
       const seasonRecs = (data.records && data.records.season) || {};
+      const streaks = (data.records && data.records.streaks) || { goals: 0, assists: 0, ga: 0 };
 
       const matchContainer = document.getElementById('profileMatchRecordsContainer');
       if (matchContainer) {
@@ -7447,6 +7542,33 @@
               <span class="text-[9px] text-slate-500 block truncate mt-0.5" title="${ma ? ma.MatchID : ''}">${ma ? (ma.MatchID || ma.season) : 'No assists'}</span>
             </div>
             <span class="text-[8px] text-cyan-400/80 font-mono mt-1">${ma ? 'Season ' + ma.season : ''}</span>
+          </div>
+
+          <!-- Goal Streak -->
+          <div class="bg-slate-950 p-3 rounded-xl border border-orange-500/20 flex flex-col justify-between shadow-sm">
+            <div>
+              <span class="text-[9px] font-black uppercase text-orange-400 tracking-wider block">🔥 Goal Streak</span>
+              <span class="text-base font-bold text-white mt-1 block">${streaks.goals || 0} Games</span>
+              <span class="text-[9px] text-slate-500 block mt-0.5">Consecutive matches scored</span>
+            </div>
+          </div>
+
+          <!-- Assist Streak -->
+          <div class="bg-slate-950 p-3 rounded-xl border border-teal-500/20 flex flex-col justify-between shadow-sm">
+            <div>
+              <span class="text-[9px] font-black uppercase text-teal-400 tracking-wider block">🎯 Assist Streak</span>
+              <span class="text-base font-bold text-white mt-1 block">${streaks.assists || 0} Games</span>
+              <span class="text-[9px] text-slate-500 block mt-0.5">Consecutive matches assisted</span>
+            </div>
+          </div>
+
+          <!-- G+A Streak -->
+          <div class="bg-slate-950 p-3 rounded-xl border border-lime-500/20 flex flex-col justify-between shadow-sm">
+            <div>
+              <span class="text-[9px] font-black uppercase text-lime-400 tracking-wider block">⚡ G+A Streak</span>
+              <span class="text-base font-bold text-white mt-1 block">${streaks.ga || 0} Games</span>
+              <span class="text-[9px] text-slate-500 block mt-0.5">Consecutive G+A matches</span>
+            </div>
           </div>
 
           <!-- Match Passes -->
