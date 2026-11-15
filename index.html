@@ -570,11 +570,12 @@
             leaderboard.sort((a, b) => b.val - a.val || b.apps - a.apps);
 
             const totalsDist = Object.values(byP)
+              .filter(x => x.g > 0 || x.a > 0)
               .map(x => ({
                 highlighted_player: x.highlighted_player, total_goals: x.g, total_assists: x.a,
-                total_shots: x.st, total_passes: x.pt, total_tackles: x.tt, total_interceptions: x.ic
+                total_shots: x.st, total_passes: x.ps, total_tackles: x.tw, total_interceptions: x.ic
               }))
-              .sort((a, b) => (b.total_goals + b.total_assists) - (a.total_goals + a.total_assists))
+              .sort((a, b) => b.total_goals - a.total_goals)
               .slice(0, 8);
 
             const topMatchArr = (col) => [...rows].filter(r => num(r[col], 0) > 0)
@@ -672,15 +673,17 @@
               leaderboard: leaderboard.slice(0, 12),
               totals_distribution: totalsDist,
               records: {
+                dribble: topMatchArr('distance_dribbled'),
                 speed: topMatchArr('average_speed'),
                 goals: topMatchArr('goals_scored'),
                 match_goals: topMatchArr('goals_scored'),
                 match_assists: topMatchArr('assists'),
                 match_passes: topMatchArr('passes_total'),
                 match_shots: topMatchArr('shots_total'),
-                match_tackles: topMatchArr('tackles_total'),
+                match_tackles: topMatchArr('tackles_won'),
                 season_goals: topSznArr('g', 'total_season_goals'),
                 season_assists: topSznArr('a', 'total_season_assists'),
+                touches: topMatchArr('touches'),
                 motm: topScopeArr('motm', 'total_motm'),
                 fan_motm: topScopeArr('motm', 'total_motm'),
                 all_time_goals: topAllArr('g', 'total_goals'),
