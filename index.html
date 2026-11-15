@@ -821,7 +821,10 @@
               ga_per_match: r.played ? round(r.ga / r.played, 2) : 0,
               gd_per_match: r.played ? round((r.gf - r.ga) / r.played, 2) : 0
             });
-            const rivals = Object.values(rivalStats).map(enrichRival).sort((a, b) => b.played - a.played || b.gd - a.gd);
+            const allRivals = Object.values(rivalStats).map(enrichRival);
+            const rivals = [...allRivals].sort((a, b) => b.played - a.played || b.w - a.w);
+            const multiRivals = allRivals.filter(r => r.played >= 2);
+            const per90Pool = multiRivals.length ? multiRivals : allRivals;
             result = {
               record: {
                 total_matches: totalM, wins: w, draws: dr, losses: l,
@@ -839,12 +842,12 @@
                 opp_interceptions: totalM ? round(oppInt / totalM, 1) : 0
               },
               team_label: teamLabel,
-              competitions: Object.values(compStats).map(enrichComp).sort((a, b) => b.matches - a.matches),
+              competitions: Object.values(compStats).map(enrichComp).sort((a, b) => b.gf - a.gf || b.matches - a.matches),
               rivals,
-              top_gf_rivals: [...rivals].sort((a, b) => b.gf - a.gf).slice(0, 10),
-              top_ga_rivals: [...rivals].sort((a, b) => b.ga - a.ga).slice(0, 10),
-              top_gf_per90_rivals: [...rivals].sort((a, b) => b.gf_per_match - a.gf_per_match).slice(0, 10),
-              top_ga_per90_rivals: [...rivals].sort((a, b) => b.ga_per_match - a.ga_per_match).slice(0, 10)
+              top_gf_rivals: [...allRivals].sort((a, b) => b.gf - a.gf || b.played - a.played).slice(0, 10),
+              top_ga_rivals: [...allRivals].sort((a, b) => b.ga - a.ga || b.played - a.played).slice(0, 10),
+              top_gf_per90_rivals: [...per90Pool].sort((a, b) => b.gf_per_match - a.gf_per_match || b.played - a.played).slice(0, 10),
+              top_ga_per90_rivals: [...per90Pool].sort((a, b) => b.ga_per_match - a.ga_per_match || b.played - a.played).slice(0, 10)
             };
           } else if (path === '/api/player-profile/list') {
             const byOrig = {};
@@ -1975,15 +1978,15 @@
             <table class="w-full text-left text-xs text-slate-300">
               <thead class="bg-slate-900 text-slate-400 text-[10px] uppercase tracking-wider border-b border-slate-800 sticky top-0">
                 <tr>
-                  <th id="thName" class="p-2.5">Tournament / Competition</th>
-                  <th class="p-2.5 text-center">Matches</th>
-                  <th class="p-2.5 text-center">W-D-L</th>
-                  <th class="p-2.5">Goals For (GF)</th>
-                  <th class="p-2.5">Goals Against (GA)</th>
-                  <th class="p-2.5 text-center">Goal Diff (GD)</th>
-                  <th class="p-2.5 text-center">GF / Match</th>
-                  <th class="p-2.5 text-center">GA / Match</th>
-                  <th class="p-2.5 text-right">Win %</th>
+                  <th id="thName" onclick="sortCompTable('name')" class="p-2.5 cursor-pointer hover:text-white select-none"><span id="thNameLabel">Tournament / Competition</span> <span class="comp-sort-ind text-emerald-400" data-col="name"></span></th>
+                  <th onclick="sortCompTable('matches')" class="p-2.5 text-center cursor-pointer hover:text-white select-none">Matches <span class="comp-sort-ind text-emerald-400" data-col="matches"></span></th>
+                  <th onclick="sortCompTable('wins')" class="p-2.5 text-center cursor-pointer hover:text-white select-none">W-D-L <span class="comp-sort-ind text-emerald-400" data-col="wins"></span></th>
+                  <th onclick="sortCompTable('gf')" class="p-2.5 cursor-pointer hover:text-white select-none">Goals For (GF) <span class="comp-sort-ind text-emerald-400" data-col="gf"></span></th>
+                  <th onclick="sortCompTable('ga')" class="p-2.5 cursor-pointer hover:text-white select-none">Goals Against (GA) <span class="comp-sort-ind text-emerald-400" data-col="ga"></span></th>
+                  <th onclick="sortCompTable('gd')" class="p-2.5 text-center cursor-pointer hover:text-white select-none">Goal Diff (GD) <span class="comp-sort-ind text-emerald-400" data-col="gd"></span></th>
+                  <th onclick="sortCompTable('gf_per_match')" class="p-2.5 text-center cursor-pointer hover:text-white select-none">GF / Match <span class="comp-sort-ind text-emerald-400" data-col="gf_per_match"></span></th>
+                  <th onclick="sortCompTable('ga_per_match')" class="p-2.5 text-center cursor-pointer hover:text-white select-none">GA / Match <span class="comp-sort-ind text-emerald-400" data-col="ga_per_match"></span></th>
+                  <th onclick="sortCompTable('win_rate')" class="p-2.5 text-right cursor-pointer hover:text-white select-none">Win % <span class="comp-sort-ind text-emerald-400" data-col="win_rate"></span></th>
                 </tr>
               </thead>
               <tbody id="compTableBody" class="divide-y divide-slate-800/60 font-mono text-[11px]"></tbody>
@@ -5187,7 +5190,7 @@
         document.getElementById('compareChartSub').textContent = 'Per-90 goal comparison by tournament';
         document.getElementById('gfPieSub').textContent = 'Share of Goals For across tournaments';
         document.getElementById('gaPieSub').textContent = 'Share of Goals Against across tournaments';
-        document.getElementById('thName').textContent = 'Tournament / Competition';
+        document.getElementById('thNameLabel').textContent = 'Tournament / Competition';
       } else {
         btnRival.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-emerald-500 text-slate-950 shadow-sm';
         btnComp.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white';
@@ -5199,7 +5202,7 @@
         document.getElementById('compareChartSub').textContent = 'Per-90 goal rates against top competitors';
         document.getElementById('gfPieSub').textContent = 'Share of Goals For across competitors';
         document.getElementById('gaPieSub').textContent = 'Share of Goals Against across competitors';
-        document.getElementById('thName').textContent = 'Competitor / Rival Club';
+        document.getElementById('thNameLabel').textContent = 'Competitor / Rival Club';
       }
       if (currentTeamStatsData) {
         renderCompetitionGoals(currentTeamStatsData);
@@ -5512,7 +5515,54 @@
       }
 
       // 5. Table Breakdown
+      window._compTableState = {
+        items: [...itemsTable],
+        isComp,
+        sortKey: window._compTableState ? window._compTableState.sortKey : null,
+        sortDir: window._compTableState ? window._compTableState.sortDir : 'desc'
+      };
+      if (window._compTableState.sortKey) {
+        sortCompTable(window._compTableState.sortKey, true);
+      } else {
+        renderCompTableRows();
+      }
+    }
+
+    function sortCompTable(key, keepDir = false) {
+      const st = window._compTableState;
+      if (!st) return;
+      if (!keepDir) {
+        if (st.sortKey === key) {
+          st.sortDir = st.sortDir === 'desc' ? 'asc' : 'desc';
+        } else {
+          st.sortKey = key;
+          st.sortDir = key === 'name' ? 'asc' : 'desc';
+        }
+      }
+      const dir = st.sortDir === 'asc' ? 1 : -1;
+      const getVal = (it) => {
+        if (key === 'name') return String(st.isComp ? it.competition : it.team || '').toLowerCase();
+        if (key === 'matches') return st.isComp ? (it.matches || 0) : (it.played || 0);
+        if (key === 'wins') return it.w !== undefined ? it.w : (it.wins || 0);
+        return Number(it[key] || 0);
+      };
+      st.items.sort((a, b) => {
+        const va = getVal(a), vb = getVal(b);
+        if (typeof va === 'string') return va.localeCompare(vb) * dir;
+        return (va - vb) * dir;
+      });
+      document.querySelectorAll('.comp-sort-ind').forEach(el => {
+        el.textContent = el.dataset.col === st.sortKey ? (st.sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+      });
+      renderCompTableRows();
+    }
+
+    function renderCompTableRows() {
+      const st = window._compTableState;
       const tbody = document.getElementById('compTableBody');
+      if (!tbody || !st) return;
+      const itemsTable = st.items;
+      const isComp = st.isComp;
       if (tbody) {
         tbody.innerHTML = '';
         const maxGf = Math.max(...itemsTable.map(it => it.gf), 1);
