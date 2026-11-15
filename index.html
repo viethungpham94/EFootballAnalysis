@@ -494,6 +494,8 @@
             const season = q.get('season') || 'all';
             const metric = q.get('metric') || 'goals';
             const minMins = parseInt(q.get('min_minutes') || '180', 10) || 0;
+            const minPasses = parseInt(q.get('min_passes') || '25', 10) || 0;
+            const minShots = parseInt(q.get('min_shots') || '5', 10) || 0;
             const rows = (d.players || []).filter(p => !season || season === 'all' || norm(p.season) === season);
 
             const byP = {};
@@ -503,15 +505,24 @@
               if (!byP[name]) {
                 byP[name] = {
                   highlighted_player: name, posCounts: {}, apps: 0, g: 0, a: 0, rSum: 0,
-                  mins: 0, pt: 0, ps: 0, st: 0, so: 0, tt: 0, tw: 0, ic: 0, cl: 0, motm: 0, mmotm: 0
+                  mins: 0, pt: 0, ps: 0, st: 0, so: 0, tt: 0, tw: 0, ic: 0, cl: 0, dr: 0, motm: 0, mmotm: 0,
+                  g3: 0, g4: 0, g5: 0, a3: 0, a4: 0, a5: 0
                 };
               }
               const x = byP[name];
               const pos = norm(r.highlighted_position);
               if (pos) x.posCounts[pos] = (x.posCounts[pos] || 0) + 1;
               x.apps += 1;
-              x.g += num(r.goals_scored, 0);
-              x.a += num(r.assists, 0);
+              const gs = num(r.goals_scored, 0);
+              const as = num(r.assists, 0);
+              x.g += gs;
+              x.a += as;
+              if (gs === 3) x.g3 += 1;
+              else if (gs === 4) x.g4 += 1;
+              else if (gs >= 5) x.g5 += 1;
+              if (as === 3) x.a3 += 1;
+              else if (as === 4) x.a4 += 1;
+              else if (as >= 5) x.a5 += 1;
               x.rSum += num(r.overall_rating, 6.0);
               x.mins += safeMins(r.time_on_pitch, 90);
               x.pt += num(r.passes_total, 0);
@@ -522,6 +533,7 @@
               x.tw += num(r.tackles_won, 0);
               x.ic += num(r.interceptions, 0);
               x.cl += num(r.clearances, 0);
+              x.dr += num(r.distance_dribbled, 0);
               x.motm += num(r.MOTM, 0);
               x.mmotm += num(r.manager_motm, 0);
             }
@@ -529,21 +541,24 @@
             const leaderboard = [];
             for (const x of Object.values(byP)) {
               if (x.mins < minMins) continue;
+              if ((metric === 'pass_acc' || metric === 'passes') && x.pt < minPasses) continue;
+              if ((metric === 'conversion' || metric === 'shot_acc') && x.st < minShots) continue;
               const ppos = Object.entries(x.posCounts).sort((a, b) => b[1] - a[1]);
               const avgRat = round(x.rSum / x.apps, 2);
-              const per90 = Math.max(1, x.mins / 90);
-              let val = x.g;
-              if (metric === 'assists') val = x.a;
-              else if (metric === 'ga') val = x.g + x.a;
-              else if (metric === 'rating') val = avgRat;
-              else if (metric === 'goals_per90') val = round(x.g / per90, 2);
-              else if (metric === 'assists_per90') val = round(x.a / per90, 2);
-              else if (metric === 'passes') val = x.pt;
-              else if (metric === 'pass_acc') val = x.pt > 0 ? round(x.ps * 100 / x.pt, 1) : 0;
-              else if (metric === 'shots') val = x.st;
-              else if (metric === 'tackles') val = x.tt;
-              else if (metric === 'interceptions') val = x.ic;
+              const per90 = Math.max(1 / 90, x.mins / 90);
+              let val = round(x.g / per90, 2);
+              if (metric === 'assists') val = round(x.a / per90, 2);
+              else if (metric === 'ratings' || metric === 'rating') val = avgRat;
+              else if (metric === 'passes') val = round(x.ps / per90, 2);
+              else if (metric === 'pass_acc') val = round(x.ps * 100 / Math.max(1, x.pt), 2);
+              else if (metric === 'shot_acc') val = round(x.so * 100 / Math.max(1, x.st), 2);
+              else if (metric === 'conversion') val = round(x.g * 100 / Math.max(1, x.st), 2);
+              else if (metric === 'tackles') val = round(x.tt / per90, 2);
+              else if (metric === 'interceptions') val = round(x.ic / per90, 2);
+              else if (metric === 'dribble') val = round(x.dr / per90, 2);
+              else if (metric === 'manager_motm') val = x.mmotm;
               else if (metric === 'motm') val = x.motm;
+              if (!(val > 0)) continue;
               leaderboard.push({
                 highlighted_player: x.highlighted_player,
                 highlighted_position: ppos.length ? ppos[0][0] : 'N/A',
@@ -675,6 +690,24 @@
                 streak_goals: topStreakArr('mg'),
                 streak_assists: topStreakArr('ma'),
                 streak_ga: topStreakArr('mga'),
+                goal_hattricks: Object.values(byP)
+                  .map(x => ({
+                    highlighted_player: x.highlighted_player,
+                    total_hattricks: x.g3 + x.g4 + x.g5,
+                    hattricks: x.g3, pokers: x.g4, five_plus: x.g5, apps: x.apps
+                  }))
+                  .filter(x => x.total_hattricks > 0)
+                  .sort((a, b) => b.total_hattricks - a.total_hattricks || b.pokers - a.pokers || b.five_plus - a.five_plus || b.apps - a.apps)
+                  .slice(0, 3),
+                assist_hattricks: Object.values(byP)
+                  .map(x => ({
+                    highlighted_player: x.highlighted_player,
+                    total_hattricks: x.a3 + x.a4 + x.a5,
+                    hattricks: x.a3, pokers: x.a4, five_plus: x.a5, apps: x.apps
+                  }))
+                  .filter(x => x.total_hattricks > 0)
+                  .sort((a, b) => b.total_hattricks - a.total_hattricks || b.pokers - a.pokers || b.five_plus - a.five_plus || b.apps - a.apps)
+                  .slice(0, 3),
                 golden_ball_by_year: gbList
               }
             };
